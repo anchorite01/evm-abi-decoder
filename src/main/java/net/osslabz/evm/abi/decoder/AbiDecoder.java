@@ -29,6 +29,11 @@ public class AbiDecoder {
         init();
     }
 
+    public AbiDecoder(String jsonStr, Boolean isBatch) {
+        this.abi = AbiDefinition.fromJson(jsonStr);
+        init();
+    }
+
     private void init() {
         for (AbiDefinition.Entry entry : this.abi) {
             String hexEncodedMethodSignature = Hex.toHexString(entry.encodeSignature());

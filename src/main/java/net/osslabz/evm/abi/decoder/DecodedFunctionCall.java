@@ -1,6 +1,7 @@
 package net.osslabz.evm.abi.decoder;
 
 import lombok.Data;
+import net.osslabz.evm.abi.definition.SolidityType;
 import net.osslabz.evm.abi.util.ByteUtil;
 
 import java.util.ArrayList;

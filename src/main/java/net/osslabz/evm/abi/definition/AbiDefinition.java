@@ -148,6 +148,9 @@ public class AbiDefinition extends ArrayList<AbiDefinition.Entry> {
                 case event:
                     result = new Event(anonymous, name, inputs, outputs);
                     break;
+                case error:
+                    result = new Error(anonymous, name, inputs, outputs);
+                    break;
             }
 
             return result;
@@ -180,6 +183,7 @@ public class AbiDefinition extends ArrayList<AbiDefinition.Entry> {
             constructor,
             function,
             event,
+            error,
             fallback,
             receive
         }
@@ -209,8 +213,8 @@ public class AbiDefinition extends ArrayList<AbiDefinition.Entry> {
                             ? param.type.decode(encoded, decodeInt(encoded, offset).intValue())
                             : param.type.decode(encoded, offset);
                     result.add(decoded);
-
-                    offset += param.type.getFixedSize();
+                    offset += (decoded instanceof Object[] && param.type.getName().equals("tuple")
+                            ? param.type.getFixedSize() * ((Object[]) decoded).length : param.getType().getFixedSize());
                 }
 
                 return result;
@@ -356,6 +360,44 @@ public class AbiDefinition extends ArrayList<AbiDefinition.Entry> {
         @Override
         public String toString() {
             return format("event %s(%s);", name, join(inputs, ", "));
+        }
+    }
+    public static class Error extends Entry {
+
+        public Error(boolean anonymous, String name, List<Param> inputs, List<Param> outputs) {
+            super(anonymous, null, name, inputs, outputs, Type.error, false);
+        }
+
+        public List<?> decode(byte[] data, byte[][] topics) {
+            List<Object> result = new ArrayList<>(inputs.size());
+
+            byte[][] argTopics = anonymous ? topics : subarray(topics, 1, topics.length);
+            List<Param> indexedParams = filteredInputs(true);
+            List<Object> indexed = new ArrayList<>();
+            for (int i = 0; i < indexedParams.size(); i++) {
+                Object decodedTopic;
+                if (indexedParams.get(i).type.isDynamicType()) {
+                    decodedTopic = SolidityType.Bytes32Type.decodeBytes32(argTopics[i], 0);
+                } else {
+                    decodedTopic = indexedParams.get(i).type.decode(argTopics[i]);
+                }
+                indexed.add(decodedTopic);
+            }
+            List<?> notIndexed = Param.decodeList(filteredInputs(false), data);
+
+            for (Param input : inputs) {
+                result.add(input.indexed ? indexed.remove(0) : notIndexed.remove(0));
+            }
+            return result;
+        }
+
+        private List<Param> filteredInputs(final boolean indexed) {
+            return select(inputs, param -> param.indexed == indexed);
+        }
+
+        @Override
+        public String toString() {
+            return format("error %s(%s);", name, join(inputs, ", "));
         }
     }
 }
